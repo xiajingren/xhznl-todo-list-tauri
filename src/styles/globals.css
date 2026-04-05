@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Transparent window for blur effect */
+html, body, #root {
+  background: transparent !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+/* App container */
+.app-container {
+  /* Semi-transparent dark background */
+  background-color: rgba(17, 24, 39, 0.75);
+
+  /* Blur - works with window blur effect */
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+
+  /* Rounded corners */
+  border-radius: 12px;
+
+  /* Subtle border */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+
+  /* Shadow */
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+
+  /* Clip content */
+  overflow: hidden;
+
+  /* Full height */
+  height: 100%;
+
+  /* Flex */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Title bar drag region */
+.title-bar {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.title-bar button {
+  -webkit-app-region: no-drag;
+}
+
+/* Scrollbar */
+.scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}

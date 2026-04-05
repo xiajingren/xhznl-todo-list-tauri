@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh repo:*)",
+      "Bash(git clone:*)",
+      "Read(//tmp/**)",
+      "WebSearch",
+      "WebFetch(domain:v2.tauri.app)",
+      "Bash(npm install:*)",
+      "Bash(npm create:*)",
+      "Bash(mv /tmp/xhznl-todo-list-tauri-temp/* .)",
+      "Bash(mv /tmp/xhznl-todo-list-tauri-temp/.* .)",
+      "Bash(npm run:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo search:*)",
+      "Bash(npx tsc:*)",
+      "Bash(lsof -ti:1420)",
+      "Bash(xargs kill:*)"
+    ]
+  }
+}
