@@ -15,7 +15,8 @@
       "Bash(cargo search:*)",
       "Bash(npx tsc:*)",
       "Bash(lsof -ti:1420)",
-      "Bash(xargs kill:*)"
+      "Bash(xargs kill:*)",
+      "Bash(gh run:*)"
     ]
   }
 }

@@ -45,14 +45,12 @@
       "icons/icon.ico"
     ],
     "publisher": "xhznl",
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": false
   },
   "plugins": {
     "updater": {
-      "active": true,
-      "endpoints": [
-        "https://your-domain.com/updates/{{target}}/{{arch}}/{{current_version}}"
-      ],
+      "active": false,
+      "endpoints": [],
       "pubkey": ""
     }
   }
