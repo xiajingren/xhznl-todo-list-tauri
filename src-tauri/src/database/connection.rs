@@ -1,76 +1,79 @@
+use crate::database::SCHEMA;
 use crate::models::{Todo, CreateTodoInput, AppSettings, WindowState};
 use chrono::Utc;
-use std::sync::Mutex;
+use sqlx::Row;
+use sqlx::sqlite::{SqlitePool, SqlitePoolOptions, SqliteConnectOptions};
 use tauri::AppHandle;
+use tauri::Manager;
 use uuid::Uuid;
 
 pub struct Database {
-    app_handle: AppHandle,
-    // In-memory storage for now (will be replaced with SQLite)
-    todos: Mutex<Vec<Todo>>,
-    settings: Mutex<AppSettings>,
-    window_state: Mutex<WindowState>,
+    pool: SqlitePool,
 }
 
 impl Database {
-    pub fn new(app_handle: AppHandle) -> Self {
-        Self {
-            app_handle,
-            todos: Mutex::new(Vec::new()),
-            settings: Mutex::new(AppSettings::default()),
-            window_state: Mutex::new(WindowState::default()),
-        }
-    }
+    pub async fn new(app_handle: AppHandle) -> Result<Self, Box<dyn std::error::Error>> {
+        // Get app data directory for database file
+        let app_dir = app_handle.path().app_data_dir()?;
+        let db_path = app_dir.join("todos.db");
 
-    pub fn initialize(&self) -> Result<(), Box<dyn std::error::Error>> {
-        // Add some default todos for testing
-        let now = Utc::now().to_rfc3339();
-        let default_todos = vec![
-            Todo {
-                id: Uuid::new_v4().to_string(),
-                content: "Click to edit, double-click checkbox to complete".to_string(),
-                completed: false,
-                priority: 0,
-                sort_order: 0,
-                list_type: "todo".to_string(),
-                created_at: now.clone(),
-                updated_at: now.clone(),
-                completed_at: None,
-            },
-            Todo {
-                id: Uuid::new_v4().to_string(),
-                content: "Drag handle to reorder".to_string(),
-                completed: false,
-                priority: 0,
-                sort_order: 1,
-                list_type: "todo".to_string(),
-                created_at: now.clone(),
-                updated_at: now.clone(),
-                completed_at: None,
-            },
-        ];
+        // Create directory if not exists
+        std::fs::create_dir_all(&app_dir)?;
 
-        let mut todos = self.todos.lock().unwrap();
-        *todos = default_todos;
+        // Configure SQLite connection
+        let options = SqliteConnectOptions::new()
+            .filename(&db_path)
+            .create_if_missing(true)
+            .foreign_keys(true);
 
-        Ok(())
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await?;
+
+        // Run schema migrations
+        sqlx::raw_sql(SCHEMA).execute(&pool).await?;
+
+        Ok(Self { pool })
     }
 
     // Todo operations
     pub async fn get_all_todos(&self) -> Result<Vec<Todo>, String> {
-        let todos = self.todos.lock().unwrap();
-        Ok(todos.clone())
+        sqlx::query_as::<_, Todo>("SELECT * FROM todos ORDER BY sort_order")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| e.to_string())
     }
 
     pub async fn create_todo(&self, input: CreateTodoInput) -> Result<Todo, String> {
         let now = Utc::now().to_rfc3339();
         let id = Uuid::new_v4().to_string();
 
-        let mut todos = self.todos.lock().unwrap();
-        let sort_order = todos.len() as i32;
+        // Get max sort_order
+        let max_order: i32 = sqlx::query("SELECT COALESCE(MAX(sort_order), -1) FROM todos")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?
+            .get::<i32, _>(0);
 
-        let todo = Todo {
-            id: id.clone(),
+        let sort_order = max_order + 1;
+
+        sqlx::query(
+            "INSERT INTO todos (id, content, completed, priority, sort_order, list_type, created_at, updated_at, completed_at)
+             VALUES (?, ?, 0, ?, ?, 'todo', ?, ?, NULL)"
+        )
+        .bind(&id)
+        .bind(&input.content)
+        .bind(input.priority.unwrap_or(0))
+        .bind(sort_order)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+        Ok(Todo {
+            id,
             content: input.content,
             completed: false,
             priority: input.priority.unwrap_or(0),
@@ -79,10 +82,7 @@ impl Database {
             created_at: now.clone(),
             updated_at: now,
             completed_at: None,
-        };
-
-        todos.push(todo.clone());
-        Ok(todo)
+        })
     }
 
     pub async fn update_todo(
@@ -92,102 +92,183 @@ impl Database {
         _completed: Option<bool>,
         priority: Option<i32>,
     ) -> Result<Todo, String> {
-        let mut todos = self.todos.lock().unwrap();
+        let now = Utc::now().to_rfc3339();
 
-        if let Some(todo) = todos.iter_mut().find(|t| t.id == id) {
-            if let Some(c) = content {
-                todo.content = c;
-            }
-            if let Some(p) = priority {
-                todo.priority = p;
-            }
-            todo.updated_at = Utc::now().to_rfc3339();
-            return Ok(todo.clone());
+        // Build dynamic update query
+        if let Some(c) = content {
+            sqlx::query("UPDATE todos SET content = ?, updated_at = ? WHERE id = ?")
+                .bind(&c)
+                .bind(&now)
+                .bind(&id)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| e.to_string())?;
         }
 
-        Err("Todo not found".to_string())
+        if let Some(p) = priority {
+            sqlx::query("UPDATE todos SET priority = ?, updated_at = ? WHERE id = ?")
+                .bind(p)
+                .bind(&now)
+                .bind(&id)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+
+        // Fetch updated todo
+        sqlx::query_as::<_, Todo>("SELECT * FROM todos WHERE id = ?")
+            .bind(&id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| format!("Todo not found: {}", e))
     }
 
     pub async fn delete_todo(&self, id: String) -> Result<(), String> {
-        let mut todos = self.todos.lock().unwrap();
-        todos.retain(|t| t.id != id);
+        sqlx::query("DELETE FROM todos WHERE id = ?")
+            .bind(&id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
         Ok(())
     }
 
     pub async fn reorder_todos(&self, todo_ids: Vec<String>) -> Result<(), String> {
-        let mut todos = self.todos.lock().unwrap();
-
         for (index, id) in todo_ids.iter().enumerate() {
-            if let Some(todo) = todos.iter_mut().find(|t| t.id == *id) {
-                todo.sort_order = index as i32;
-            }
+            sqlx::query("UPDATE todos SET sort_order = ? WHERE id = ?")
+                .bind(index as i32)
+                .bind(id)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| e.to_string())?;
         }
 
-        todos.sort_by(|a, b| a.sort_order.cmp(&b.sort_order));
         Ok(())
     }
 
     pub async fn move_to_done(&self, id: String) -> Result<Todo, String> {
-        let mut todos = self.todos.lock().unwrap();
+        let now = Utc::now().to_rfc3339();
 
-        if let Some(todo) = todos.iter_mut().find(|t| t.id == id) {
-            todo.list_type = "done".to_string();
-            todo.completed = true;
-            todo.completed_at = Some(Utc::now().to_rfc3339());
-            todo.updated_at = Utc::now().to_rfc3339();
-            return Ok(todo.clone());
-        }
+        sqlx::query(
+            "UPDATE todos SET list_type = 'done', completed = 1, completed_at = ?, updated_at = ? WHERE id = ?"
+        )
+        .bind(&now)
+        .bind(&now)
+        .bind(&id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
-        Err("Todo not found".to_string())
+        sqlx::query_as::<_, Todo>("SELECT * FROM todos WHERE id = ?")
+            .bind(&id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| format!("Todo not found: {}", e))
     }
 
     pub async fn move_to_todo(&self, id: String) -> Result<Todo, String> {
-        let mut todos = self.todos.lock().unwrap();
+        let now = Utc::now().to_rfc3339();
 
-        if let Some(todo) = todos.iter_mut().find(|t| t.id == id) {
-            todo.list_type = "todo".to_string();
-            todo.completed = false;
-            todo.completed_at = None;
-            todo.updated_at = Utc::now().to_rfc3339();
-            return Ok(todo.clone());
-        }
+        sqlx::query(
+            "UPDATE todos SET list_type = 'todo', completed = 0, completed_at = NULL, updated_at = ? WHERE id = ?"
+        )
+        .bind(&now)
+        .bind(&id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
-        Err("Todo not found".to_string())
+        sqlx::query_as::<_, Todo>("SELECT * FROM todos WHERE id = ?")
+            .bind(&id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| format!("Todo not found: {}", e))
     }
 
     // Settings operations
     pub async fn get_settings(&self) -> Result<AppSettings, String> {
-        let settings = self.settings.lock().unwrap();
-        Ok(settings.clone())
+        let row = sqlx::query("SELECT value FROM settings WHERE key = 'app_settings'")
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        match row {
+            Some(r) => {
+                let json: String = r.get::<String, _>(0);
+                serde_json::from_str(&json)
+                    .map_err(|e| e.to_string())
+            },
+            None => Ok(AppSettings::default()),
+        }
     }
 
     pub async fn update_settings(&self, settings: AppSettings) -> Result<(), String> {
-        let mut current = self.settings.lock().unwrap();
-        *current = settings;
+        let json = serde_json::to_string(&settings)
+            .map_err(|e| e.to_string())?;
+
+        sqlx::query("INSERT OR REPLACE INTO settings (key, value) VALUES ('app_settings', ?)")
+            .bind(&json)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
+
         Ok(())
     }
 
     // Window state operations
     pub async fn get_window_state(&self) -> Result<WindowState, String> {
-        let state = self.window_state.lock().unwrap();
-        Ok(state.clone())
+        let result = sqlx::query_as::<_, WindowStateRow>(
+            "SELECT x, y, width, height, is_maximized FROM window_state WHERE id = 1"
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+        match result {
+            Some(row) => Ok(WindowState {
+                x: row.x,
+                y: row.y,
+                width: row.width,
+                height: row.height,
+                is_maximized: row.is_maximized != 0,
+            }),
+            None => Ok(WindowState::default()),
+        }
     }
 
     pub async fn save_window_state(&self, state: WindowState) -> Result<(), String> {
-        let mut current = self.window_state.lock().unwrap();
-        *current = state;
+        sqlx::query(
+            "INSERT OR REPLACE INTO window_state (id, x, y, width, height, is_maximized)
+             VALUES (1, ?, ?, ?, ?, ?)"
+        )
+        .bind(state.x)
+        .bind(state.y)
+        .bind(state.width)
+        .bind(state.height)
+        .bind(state.is_maximized as i32)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
         Ok(())
     }
 }
 
-// Make Database clonable for Tauri State
+// Helper struct for window_state row (SQLite stores boolean as INTEGER)
+#[derive(sqlx::FromRow)]
+struct WindowStateRow {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    is_maximized: i32,
+}
+
+// Make Database clonable for Tauri State (SqlitePool is clonable)
 impl Clone for Database {
     fn clone(&self) -> Self {
         Self {
-            app_handle: self.app_handle.clone(),
-            todos: Mutex::new(self.todos.lock().unwrap().clone()),
-            settings: Mutex::new(self.settings.lock().unwrap().clone()),
-            window_state: Mutex::new(self.window_state.lock().unwrap().clone()),
+            pool: self.pool.clone(),
         }
     }
 }

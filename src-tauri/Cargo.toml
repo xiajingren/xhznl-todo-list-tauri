@@ -29,6 +29,7 @@ rust_xlsxwriter = "0.64"
 uuid = { version = "1", features = ["v4"] }
 tokio = { version = "1", features = ["full"] }
 thiserror = "1"
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.26"

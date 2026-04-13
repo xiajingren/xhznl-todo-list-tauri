@@ -1,15 +1,28 @@
 use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
 pub struct Todo {
     pub id: String,
     pub content: String,
+    #[sqlx(rename = "completed")]
     pub completed: bool,
     pub priority: i32,
+    #[serde(rename = "sortOrder")]
+    #[sqlx(rename = "sort_order")]
     pub sort_order: i32,
-    pub list_type: String,  // "todo" or "done"
+    #[serde(rename = "listType")]
+    #[sqlx(rename = "list_type")]
+    pub list_type: String,
+    #[serde(rename = "createdAt")]
+    #[sqlx(rename = "created_at")]
     pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    #[sqlx(rename = "updated_at")]
     pub updated_at: String,
+    #[serde(rename = "completedAt")]
+    #[sqlx(rename = "completed_at")]
     pub completed_at: Option<String>,
 }
 

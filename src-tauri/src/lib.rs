@@ -56,15 +56,16 @@ pub fn run() {
                 }
             }
 
-            // Initialize database
-            let db = database::Database::new(app.handle().clone());
-            db.initialize()?;
+            // Initialize database asynchronously
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::block_on(async {
+                let db = database::Database::new(app_handle).await
+                    .expect("Failed to initialize database");
+                app.manage(db);
+            });
 
             // Setup system tray
             tray::setup::setup_tray(app)?;
-
-            // Manage database state
-            app.manage(db);
 
             Ok(())
         })
