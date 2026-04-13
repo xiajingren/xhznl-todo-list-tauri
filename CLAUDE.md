@@ -22,7 +22,7 @@ src/
 
 src-tauri/src/
   commands/      # Tauri command handlers (todo, settings, export)
-  database/      # In-memory storage (Mutex<Vec<Todo>>)
+  database/      # SQLite storage via sqlx
   models/        # Rust data models
   tray/          # System tray setup
 ```
@@ -36,6 +36,17 @@ src-tauri/src/
 3. **macOS rounded corners** - Requires Cocoa API calls in `lib.rs` setup. `setCornerRadius` on content view layer.
 
 4. **Mouse penetration** - Must disable when settings panel is open (`setIgnoreCursorEvents(false)`).
+
+5. **Serde naming convention** - Backend uses snake_case, frontend expects camelCase. Add `#[serde(rename_all = "camelCase")]` to all structs returned to frontend.
+
+6. **Window drag region** - Use `data-tauri-drag-region` attribute on draggable elements. CSS `-webkit-app-region: drag` alone may not work in Tauri v2.
+
+7. **sqlx Row trait** - Import `sqlx::Row` when using `.get()` on query results.
+
+## Database
+
+- SQLite database stored at `~/Library/Application Support/com.xhznl.todolist/todos.db`
+- Uses sqlx with async operations via `SqlitePool`
 
 ## Platform Notes
 

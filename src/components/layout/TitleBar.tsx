@@ -7,8 +7,8 @@ export function TitleBar() {
   const toggleMousePenetration = useSettingsStore((state) => state.toggleMousePenetration);
 
   return (
-    <div className="title-bar flex items-center justify-between h-8 px-2 bg-gray-800/50 select-none">
-      <span className="text-xs text-gray-400 font-medium">Todo List</span>
+    <div className="title-bar flex items-center justify-between h-8 px-2 bg-gray-800/50 select-none" data-tauri-drag-region>
+      <span className="text-xs text-gray-400 font-medium" data-tauri-drag-region>Todo List</span>
 
       <div className="flex items-center gap-1">
         {/* Settings button */}

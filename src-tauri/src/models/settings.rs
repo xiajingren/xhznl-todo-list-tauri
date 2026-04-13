@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub auto_start: bool,
     pub mouse_penetration: bool,
@@ -22,6 +23,7 @@ impl Default for AppSettings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WindowState {
     pub x: i32,
     pub y: i32,
@@ -67,7 +69,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&settings).unwrap();
-        assert!(json.contains("\"auto_start\":true"));
+        assert!(json.contains("\"autoStart\":true"));
         assert!(json.contains("\"opacity\":0.7"));
 
         let deserialized: AppSettings = serde_json::from_str(&json).unwrap();
@@ -97,7 +99,7 @@ mod tests {
 
         let json = serde_json::to_string(&state).unwrap();
         assert!(json.contains("\"x\":100"));
-        assert!(json.contains("\"is_maximized\":true"));
+        assert!(json.contains("\"isMaximized\":true"));
 
         let deserialized: WindowState = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.x, 100);

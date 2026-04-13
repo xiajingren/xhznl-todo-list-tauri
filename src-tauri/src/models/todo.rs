@@ -61,7 +61,7 @@ mod tests {
         let json = serde_json::to_string(&todo).unwrap();
         assert!(json.contains("test-123"));
         assert!(json.contains("Test todo"));
-        assert!(json.contains("\"list_type\":\"todo\""));
+        assert!(json.contains("\"listType\":\"todo\""));
 
         let deserialized: Todo = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.id, todo.id);
@@ -83,8 +83,8 @@ mod tests {
         };
 
         let json = serde_json::to_string(&todo).unwrap();
-        assert!(json.contains("completed_at"));
-        assert!(json.contains("\"list_type\":\"done\""));
+        assert!(json.contains("completedAt"));
+        assert!(json.contains("\"listType\":\"done\""));
         assert!(json.contains("\"completed\":true"));
     }
 
