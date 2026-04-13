@@ -123,7 +123,7 @@ describe('todoStore', () => {
   describe('moveToDone', () => {
     it('should move todo from todos to doneTodos', async () => {
       useTodoStore.setState({ todos: [mockTodo], doneTodos: [] });
-      const doneVersion = { ...mockTodo, listType: 'done', completed: true };
+      const doneVersion = { ...mockTodo, listType: 'done' as const, completed: true };
       vi.mocked(db.moveToDone).mockResolvedValue(doneVersion);
 
       await useTodoStore.getState().moveToDone('test-1');
@@ -138,7 +138,7 @@ describe('todoStore', () => {
   describe('moveToTodo', () => {
     it('should move todo from doneTodos to todos', async () => {
       useTodoStore.setState({ todos: [], doneTodos: [mockDoneTodo] });
-      const todoVersion = { ...mockDoneTodo, listType: 'todo', completed: false };
+      const todoVersion = { ...mockDoneTodo, listType: 'todo' as const, completed: false };
       vi.mocked(db.moveToTodo).mockResolvedValue(todoVersion);
 
       await useTodoStore.getState().moveToTodo('test-2');
@@ -173,7 +173,7 @@ describe('todoStore', () => {
   describe('toggleComplete', () => {
     it('should call moveToDone if todo is in todos list', async () => {
       useTodoStore.setState({ todos: [mockTodo] });
-      const doneVersion = { ...mockTodo, listType: 'done' };
+      const doneVersion = { ...mockTodo, listType: 'done' as const };
       vi.mocked(db.moveToDone).mockResolvedValue(doneVersion);
 
       await useTodoStore.getState().toggleComplete('test-1');
@@ -183,7 +183,7 @@ describe('todoStore', () => {
 
     it('should call moveToTodo if todo is in doneTodos list', async () => {
       useTodoStore.setState({ doneTodos: [mockDoneTodo] });
-      const todoVersion = { ...mockDoneTodo, listType: 'todo' };
+      const todoVersion = { ...mockDoneTodo, listType: 'todo' as const };
       vi.mocked(db.moveToTodo).mockResolvedValue(todoVersion);
 
       await useTodoStore.getState().toggleComplete('test-2');
